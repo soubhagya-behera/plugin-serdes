@@ -19,13 +19,17 @@ public class ComplexUnionTest {
             Arguments.of("null", Arrays.asList(Schema.Type.NULL, Schema.Type.BOOLEAN), null),
             Arguments.of("null", Arrays.asList(Schema.Type.BOOLEAN, Schema.Type.NULL), null),
             Arguments.of("1", Arrays.asList(Schema.Type.INT, Schema.Type.NULL), 1),
-            // #397: a real non-empty string listed in nullValues must resolve to the STRING branch
-            // regardless of declaration order, never be fabricated into a null by the NULL branch.
-            Arguments.of("n/a", Arrays.asList(Schema.Type.NULL, Schema.Type.STRING), new Utf8("n/a")),
-            Arguments.of("n/a", Arrays.asList(Schema.Type.STRING, Schema.Type.NULL), new Utf8("n/a")),
-            Arguments.of("null", Arrays.asList(Schema.Type.NULL, Schema.Type.STRING), new Utf8("null")),
-            Arguments.of("null", Arrays.asList(Schema.Type.STRING, Schema.Type.NULL), new Utf8("null")),
-            // Negative control: unions without a STRING branch keep the existing behavior,
+            // #397 (maintainer direction): a string listed in nullValues resolves to NULL
+            // whenever the union has a NULL branch, regardless of branch order.
+            Arguments.of("n/a", Arrays.asList(Schema.Type.NULL, Schema.Type.STRING), null),
+            Arguments.of("n/a", Arrays.asList(Schema.Type.STRING, Schema.Type.NULL), null),
+            Arguments.of("null", Arrays.asList(Schema.Type.NULL, Schema.Type.STRING), null),
+            Arguments.of("null", Arrays.asList(Schema.Type.STRING, Schema.Type.NULL), null),
+            Arguments.of("", Arrays.asList(Schema.Type.NULL, Schema.Type.STRING), null),
+            Arguments.of("", Arrays.asList(Schema.Type.STRING, Schema.Type.NULL), null),
+            // Unions without a NULL branch are untouched: the literal string is preserved.
+            Arguments.of("n/a", Arrays.asList(Schema.Type.STRING, Schema.Type.INT), new Utf8("n/a")),
+            // Unions without a STRING branch keep the existing behavior,
             // a nullValues string still resolves to NULL in both declaration orders.
             Arguments.of("n/a", Arrays.asList(Schema.Type.NULL, Schema.Type.INT), null),
             Arguments.of("n/a", Arrays.asList(Schema.Type.INT, Schema.Type.NULL), null),

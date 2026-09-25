@@ -458,43 +458,30 @@ public class AvroConverter {
     }
 
     protected Object complexUnion(Schema schema, Object data, OnBadLines onBadLines, String fieldName) {
-        if (data instanceof String && !((String) data).isEmpty() && hasStringBranch(schema)) {
-            // #397: a real non-empty string must not be consumed by the NULL branch merely because NULL
-            // is declared first (InferAvroSchema always emits ["null", T]). Try the non-NULL branches in
-            // their existing declaration order first, and only fall back to NULL afterwards. Empty strings
-            // keep the legacy order on purpose ("" is an intentional nullValues marker for CSV flows).
-            for (Schema current : schema.getTypes()) {
-                if (current.getType() == Schema.Type.NULL) {
-                    continue;
-                }
-                try {
-                    return this.convert(current, data, onBadLines, fieldName);
-                } catch (Exception ignored) {
-                }
+        if (hasNullBranch(schema)) {
+            // #397 (maintainer direction): nullValues wins whenever a NULL branch exists,
+            // regardless of branch order. This keeps inferred ["null", T] behavior unchanged
+            // and fixes ["string", "null"] to agree with ["null", "string"].
+            if (data == null) {
+                return null;
             }
-            for (Schema current : schema.getTypes()) {
-                if (current.getType() != Schema.Type.NULL) {
-                    continue;
-                }
-                try {
-                    return this.convert(current, data, onBadLines, fieldName);
-                } catch (Exception ignored) {
-                }
+            if (data instanceof String && this.contains(this.getNullValues(), (String) data)) {
+                return null;
             }
-        } else {
-            for (Schema current : schema.getTypes()) {
-                try {
-                    return this.convert(current, data, onBadLines, fieldName);
-                } catch (Exception ignored) {
-                }
+        }
+
+        for (Schema current : schema.getTypes()) {
+            try {
+                return this.convert(current, data, onBadLines, fieldName);
+            } catch (Exception ignored) {
             }
         }
 
         throw new IllegalArgumentException("Invalid data for schema \"" + schema.getType() + "\"");
     }
 
-    private static boolean hasStringBranch(Schema schema) {
-        return schema.getTypes().stream().anyMatch(branch -> branch.getType() == Schema.Type.STRING);
+    private static boolean hasNullBranch(Schema schema) {
+        return schema.getTypes().stream().anyMatch(branch -> branch.getType() == Schema.Type.NULL);
     }
 
     protected GenericData.Fixed complexFixed(Schema schema, Object data) {
